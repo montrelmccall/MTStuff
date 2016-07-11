@@ -1,0 +1,535 @@
+import java.util.Scanner;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
+import java.util.InputMismatchException;
+
+//https://fireplex.github.io
+
+/*
+ * Montrel McCall
+ * Assignment 2
+ * COP 4600
+ * Summer 2016
+ */
+
+public class McCallA2 {
+
+	public static void main(String[] args) {
+	
+		//read input
+		File input = new File("input.txt");
+		
+		Scanner scanner;
+		try{
+			
+			PrintWriter output = new PrintWriter("output.txt", "UTF-8");
+			
+			scanner = new Scanner(input);
+			
+			int totalInputLines = 0;
+			
+			while(scanner.hasNext()){
+			//count the lines
+			totalInputLines++;	
+			scanner.nextLine();
+			}
+			
+			String inputLines[] = new String[totalInputLines];
+			
+			//reset the scanner
+			scanner = new Scanner(input);
+			int totalProcesses = 0;
+			for(int i = 0; i < inputLines.length; i++){
+				inputLines[i] = scanner.nextLine();
+				
+				//find total processes
+				if(inputLines[i].length() > 2 && inputLines[i].substring(0,1).equals("P") && isInt(inputLines[i].substring(1,2))){
+					totalProcesses++;
+				}
+				
+			}
+			
+			//all lines of input are now stored
+			//store the processes
+			process [] listOfProcesses  = new process[totalProcesses];
+			
+			//reset the scanner
+			scanner = new Scanner(input);
+			
+			//check to see if it is a process
+			for(int i = 0; i < listOfProcesses.length; i++){
+				listOfProcesses[i] = new process();
+				listOfProcesses[i].name = scanner.next();
+				listOfProcesses[i].arrivalTime = scanner.nextInt();
+				listOfProcesses[i].burstTime = scanner.nextInt();
+				listOfProcesses[i].priority = scanner.nextInt();	
+			}
+			
+			
+			//begin operations
+			for(int i = listOfProcesses.length; i <  inputLines.length; i++){
+				
+				//reset the process data
+				for(int j = 0; j < listOfProcesses.length; j++){
+					listOfProcesses[j].reset();
+				}
+				arrivalTimeSelectionSort(listOfProcesses);
+				
+				//print out the title
+				if(!inputLines[i].equals("0") && !inputLines[i].equals("")){
+					output.println(inputLines[i] +"\n-------\n");
+				}
+				
+				//first come first serve
+				if(inputLines[i].equals("FCFS")){
+					//sort processes by arrival time
+					output.println(FCFS(listOfProcesses));
+				}else if(inputLines[i].equals("PP")){
+					//premptive priority
+					output.println(premptivePriority(listOfProcesses));				
+				}else if(inputLines[i].equals("P")){		
+					//priority		
+					output.println(priority(listOfProcesses));
+				}else if(inputLines[i].equals("SJF")){
+					output.println(shortestJobFirst(listOfProcesses));
+				}else if(inputLines[i].equals("SRTF")){
+					output.println(SRTF(listOfProcesses));
+				}
+				
+				
+				
+				/*choose with operation to begin
+				*First Come, First Serve
+				*Pre-emptive Priority
+				*Priority
+				*Round Robin
+				*Shortest Job First
+				*Shortest Remaining Time First
+				*/
+				
+				
+			}
+			
+			
+			output.close();
+			//20 processes maximum, 1 minimum
+		}catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (UnsupportedEncodingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+	}
+	
+public static String SRTF(process [] listOfProcesses){
+		
+		//processes arrive in order based on arrival time
+		String result = "";
+		
+		int counter = 0;
+		int time = 0;
+		boolean idle = false;
+		boolean started = false;
+		String currentProcess = "";
+		
+		//while the processes aren't complete
+		while(!allComplete(listOfProcesses)){
+			//not all processes will be able to be ran
+			//create a list to store them in
+			process [] runable = runableArray(listOfProcesses, time);
+			
+			//sort the runnable processes by priority
+			timeLeftSelectionSort(runable);
+			
+			//Check if the array is empty
+			if(runable.length == 0){
+				//if no process can run, the cpu is idle
+				if(!idle){
+					idle = true;
+					result +=  "CPU is idle from " + time + " - ";
+				}
+				time++;
+			}else{
+				//if list isn't empty, run the first process that is runable
+				
+				if(idle){
+					idle = false;
+					result += time + "\n";
+				}
+				
+				if(!currentProcess.equals(runable[0].name) && started){
+					result += time + "\n" + runable[0].name +" runs from " + time + " - ";
+					currentProcess = runable[0].name;
+				}else if(!currentProcess.equals(runable[0].name)){
+					started = true;
+					result += runable[0].name +" runs from " + time + " - ";
+					currentProcess = runable[0].name;
+				}
+
+				//update everything
+				time++;
+				runable[0].timeLeft--;
+				if(runable[0].timeLeft == 0){
+					runable[0].completed = true;
+				}
+				updateProcess(listOfProcesses, runable[0]);				
+			}
+	
+		}
+		
+		result += time +"\n";
+		
+		return result;
+	}
+	
+public static String shortestJobFirst(process [] listOfProcesses){
+		
+		//processes arrive in order based on arrival time
+		String result = "";
+		
+		int counter = 0;
+		int time = 0;
+		boolean idle = false;
+		
+		//while the processes aren't complete
+		while(!allComplete(listOfProcesses)){
+			//not all processes will be able to be ran
+			//create a list to store them in
+			process [] runable = runableArray(listOfProcesses, time);
+			
+			//sort the runnable processes by priority
+			burstTimeSelectionSort(runable);
+			
+			//Check if the array is empty
+			if(runable.length == 0){
+				//if no process can run, the cpu is idle
+				if(!idle){
+					idle = true;
+					result +=  "CPU is idle from " + time + " - ";
+				}
+				time++;
+			}else{
+				//if list isn't empty, run the first process that is runable
+				
+				if(idle){
+					idle = false;
+					result += time + "\n";
+				}
+
+				//update everything
+				result += runable[0].name +" runs from " + time + " - " + (time + runable[0].burstTime) +"\n";
+				time += runable[0].burstTime;
+				runable[0].completed = true;
+				updateProcess(listOfProcesses, runable[0]);				
+			}
+	
+		}
+		
+		
+		return result;
+	}
+	
+	
+public static String premptivePriority(process [] listOfProcesses){
+		
+		//processes arrive in order based on arrival time
+		String result = "";
+		
+		int counter = 0;
+		int time = 0;
+		boolean idle = false;
+		boolean started = false;
+		String currentProcess = "";
+		
+		//while the processes aren't complete
+		while(!allComplete(listOfProcesses)){
+			//not all processes will be able to be ran
+			//create a list to store them in
+			process [] runable = runableArray(listOfProcesses, time);
+			
+			//sort the runnable processes by priority
+			prioritySelectionSort(runable);
+			
+			//Check if the array is empty
+			if(runable.length == 0){
+				//if no process can run, the cpu is idle
+				if(!idle){
+					idle = true;
+					result +=  "CPU is idle from " + time + " - ";
+				}
+				time++;
+			}else{
+				//if list isn't empty, run the first process that is runable
+				
+				if(idle){
+					idle = false;
+					result += time + "\n";
+				}
+				
+				if(!currentProcess.equals(runable[0].name) && started){
+					result += time + "\n" + runable[0].name +" runs from " + time + " - ";
+					currentProcess = runable[0].name;
+				}else if(!currentProcess.equals(runable[0].name)){
+					started = true;
+					result += runable[0].name +" runs from " + time + " - ";
+					currentProcess = runable[0].name;
+				}
+
+				//update everything
+				time++;
+				runable[0].timeLeft--;
+				if(runable[0].timeLeft == 0){
+					runable[0].completed = true;
+				}
+				updateProcess(listOfProcesses, runable[0]);				
+			}
+	
+		}
+		
+		result += time +"\n";
+		
+		return result;
+	}
+	
+	public static String priority(process [] listOfProcesses){
+		
+		//processes arrive in order based on arrival time
+		String result = "";
+		
+		int counter = 0;
+		int time = 0;
+		boolean idle = false;
+		
+		//while the processes aren't complete
+		while(!allComplete(listOfProcesses)){
+			//not all processes will be able to be ran
+			//create a list to store them in
+			process [] runable = runableArray(listOfProcesses, time);
+			
+			//sort the runnable processes by priority
+			prioritySelectionSort(runable);
+			
+			//Check if the array is empty
+			if(runable.length == 0){
+				//if no process can run, the cpu is idle
+				if(!idle){
+					idle = true;
+					result +=  "CPU is idle from " + time + " - ";
+				}
+				time++;
+			}else{
+				//if list isn't empty, run the first process that is runable
+				
+				if(idle){
+					idle = false;
+					result += time + "\n";
+				}
+
+				//update everything
+				result += runable[0].name +" runs from " + time + " - " + (time + runable[0].burstTime) +"\n";
+				time += runable[0].burstTime;
+				runable[0].completed = true;
+				updateProcess(listOfProcesses, runable[0]);				
+			}
+	
+		}
+		
+		
+		return result;
+	}
+	
+	public static String FCFS(process [] listOfProcesses){
+		//list should be sorted before algorithm starts
+		String result = "";
+		
+		
+		for(int i = 0, time = 0; i < listOfProcesses.length; i++){
+
+			
+				//check if the next process has arrived
+				boolean idle = false;
+				
+				if( time < listOfProcesses[i].arrivalTime){
+					result += "CPU is idle from " + time + " - ";
+					idle = true;
+				}
+				
+				while(time < listOfProcesses[i].arrivalTime){
+					time++;
+				}
+				
+				if(idle){
+					result += time + "\n";
+				}
+				
+				//when cpu is not idle
+				result += listOfProcesses[i].name + " runs from " + time + " - " + (time + listOfProcesses[i].burstTime) + "\n";
+				
+				time += listOfProcesses[i].burstTime;
+				
+			
+		}
+		
+		return result;
+	}
+	
+	public static void updateProcess(process [] list, process processInQuestion){
+		
+		for(int i = 0; i < list.length; i++){
+			if(list[i].name.equals(processInQuestion)){
+				list[i] = processInQuestion;
+			}
+		}
+		
+		
+	}
+	
+	//returns a list filled with processes that can be ran
+	public static process [] runableArray(process [] list, int time){
+		
+		
+		int arrayLength = 0;
+			for(int i = 0, pos = 0; i < list.length;i++){
+			
+			if(list[i].arrivalTime <= time && !list[i].completed){
+				arrayLength++;
+			}
+			
+		}
+		
+			process [] result = new process [arrayLength];
+		
+		for(int i = 0, pos = 0; i < list.length;i++){
+			
+			if(list[i].arrivalTime <= time && !list[i].completed){
+				result[pos++] = list[i];
+			}
+			
+		}
+		
+		return result;
+	}
+	
+	public static boolean allComplete(process [] list){
+		for(int i = 0; i < list.length; i++){
+			if(!list[i].completed){
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	public static boolean isInt(String s){
+		
+		try{
+			int i = Integer.parseInt(s);
+			return true;
+		}catch(NumberFormatException er){
+			return false;
+		}
+	}
+	
+	public static void arrivalTimeSelectionSort(process list []){
+	
+		for(int i = 0; i < list.length; i++){
+			for(int j = i+1; j < list.length; j++){
+				if(list[i].arrivalTime > list[j].arrivalTime){
+					process hold = list[i];
+					list[i] = list[j];
+					list[j] = hold;
+				}
+			}
+	
+		}
+		
+	}
+	
+	public static void prioritySelectionSort(process list []){
+		
+		for(int i = 0; i < list.length; i++){
+			for(int j = i+1; j < list.length; j++){
+				
+				if(list[i].priority > list[j].priority){
+					process hold = list[i];
+					list[i] = list[j];
+					list[j] = hold;
+				}
+				
+			}
+	
+		}
+		
+	}
+	
+	public static void burstTimeSelectionSort(process list []){
+		
+		for(int i = 0; i < list.length; i++){
+			for(int j = i+1; j < list.length; j++){
+				
+				if(list[i].burstTime > list[j].burstTime){
+					process hold = list[i];
+					list[i] = list[j];
+					list[j] = hold;
+				}
+				
+			}
+	
+		}
+		
+	}
+	
+		public static void timeLeftSelectionSort(process list []){
+		
+		for(int i = 0; i < list.length; i++){
+			for(int j = i+1; j < list.length; j++){
+				
+				if(list[i].timeLeft > list[j].timeLeft){
+					process hold = list[i];
+					list[i] = list[j];
+					list[j] = hold;
+				}
+				
+			}
+	
+		}
+		
+	}
+	
+	
+	
+
+	public static class process{
+		
+		String name;
+		int arrivalTime;
+		int burstTime;
+		int timeLeft;
+		int priority; //smaller number = greater priority
+		boolean completed = false;
+		
+		
+		public process(){}
+		
+		public void reset(){
+			timeLeft = burstTime;
+			completed = false;
+		}
+		
+	}
+	
+	
+	/* Never mind, not using this
+	public static class contextSwitch{
+		
+		int time;
+		String pName; //process name
+		
+		public contextSwitch(){}
+		
+	}
+	*/
+}
